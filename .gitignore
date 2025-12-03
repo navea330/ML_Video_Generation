@@ -1,0 +1,11 @@
+venv/
+.venv/
+env/
+__pycache__/
+.ipynb_checkpoints/
+data/
+datasets/
+*.pt
+*.mp4
+*.zip
+*.npy
