@@ -9,3 +9,5 @@ datasets/
 *.mp4
 *.zip
 *.npy
+hf_env/
+.env
