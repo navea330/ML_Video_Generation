@@ -10,3 +10,4 @@ datasets/
 *.zip
 *.npy
 hf_env/
+.env
