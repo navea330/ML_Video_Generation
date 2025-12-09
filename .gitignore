@@ -10,4 +10,5 @@ datasets/
 *.zip
 *.npy
 hf_env/
-.env
+checkpoints/
+outputs/

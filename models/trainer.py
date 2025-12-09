@@ -1,91 +1,110 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+import torch.optim as optim
 from tqdm import tqdm
+from data.datasets import download_dataset, get_dataloaders
+from models.plantcnn import build_model
+from evals.visualizer import plot_training_curves
+from config import IMG_SIZE
 
+def train_model(
+    device="cpu",
+    num_epochs=20,
+    lr=1e-4,
+    patience_limit=5,
+    batch_size=None
+):
+    path = download_dataset()
+    train_loader, val_loader, test_loader, classes = get_dataloaders(path, batch_size=batch_size)
+    
+    
 
-from models.video_gen import VideoGenerator
-from scripts.clip import get_embedding
-from scripts.MSRVTT import train_ds, test_ds
-from dataset.msrvtt import MSRVTTDataset
-from scripts.video_saves import save_video
+    num_classes = len(classes)
+    model = build_model(num_classes).to(device)
 
-def train_model(device ="cpu", batch_size = 4, num_epochs =3, lr = 1e-4):
-    import clip
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    clip_model, _ = clip.load("ViT-B/32", device = device)
-
-    train_pt = MSRVTTDataset(train_ds["train"], clip_model, device)
-    train_loader = DataLoader(train_pt, batch_size = batch_size, shuffle = True)
-
-    test_pt = MSRVTTDataset(test_ds["test"], clip_model, device)
-    test_loader = DataLoader(test_pt, batch_size = batch_size, shuffle = False)
-
-    model = VideoGenerator().to(device)
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-    best_loss = float("inf")
+    best_val_loss = float("inf")
     patience = 0
-
+    train_losses = []
+    val_losses = []
+    val_accuracies = []
     for epoch in range(num_epochs):
         model.train()
-        epoch_loss = 0
+        running_loss = 0
 
-        for text_emb, video in tqdm(train_loader):
-            text_emb = text_emb.to(device)
-            video = video.to(device)
-
-            pred_video = model(text_emb.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))
-            loss = criterion(pred_video, video)
+        for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Train]"):
+            images, labels = images.to(device), labels.to(device)
 
             optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            epoch_loss += loss.item()
+            running_loss += loss.item() * images.size(0)
+
+        train_loss = running_loss / len(train_loader.dataset)
+
+
         
         model.eval()
-        test_loss =0
-
+        val_loss = 0
+        correct = 0
+        total = 0
         with torch.no_grad():
+            for images, labels in tqdm(val_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"):
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item() * images.size(0)
 
-            sample_text, sample_vid = next(iter(test_loader))
-            sample_text = sample_text.to(device)
-            sample_vid = sample_vid.to(device)
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-            sample_pred = model(sample_text.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))
-            for text_emb, video in test_loader:
-                text_emb = text_emb.to(device)
-                video = video.to(device)
-
-                pred_video = model(text_emb.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))
-                loss = criterion(pred_video, video)
-                test_loss += loss.item()
+        val_loss /= len(val_loader.dataset)
+        val_acc = correct / total
         
-        print(f"Epoch {epoch+1}/{num_epochs} - Avg Test Loss: {test_loss/len(test_loader)}")
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+        val_accuracies.append(val_acc)
 
-        save_video(sample_pred[0], f"results/epoch_{epoch+1}_pred.mp4")
-        save_video(sample_vid[0], f"results/epoch_{epoch+1}_gt.mp4")
+        print(f"Epoch {epoch+1}: Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}, Val Acc = {val_acc:.4f}")
 
-        if (test_loss/len(test_loader)) < best_loss:
-            best_loss = test_loss/len(test_loader)
+        
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
             patience = 0
-            torch.save(model.state_dict(), "checkpoints/video_generator.pth")
+            torch.save(model.state_dict(), "checkpoints/plant_cnn_best.pth")
         else:
             patience += 1
-            if patience >= 3:
-                print("Early stop triggered")
+            if patience >= patience_limit:
+                print("Early stopping triggered!")
                 break
-        print("Training completed")
-
-
-
-
-if __name__ == "__main__":
-    import torch
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    train_model(device=device, batch_size=4, num_epochs=3, lr=1e-4)
 
     
+    model.load_state_dict(torch.load("checkpoints/plant_cnn_best.pth"))
+    model.eval()
+    test_loss = 0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for images, labels in tqdm(test_loader, desc="Testing"):
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            test_loss += loss.item() * images.size(0)
+
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    test_loss /= len(test_loader.dataset)
+    test_acc = correct / total
+    print(f"Test Loss = {test_loss:.4f}, Test Acc = {test_acc:.4f}")
+
+    plot_training_curves(train_losses, val_losses, val_accuracies, save_path = "outputs/training_curves.png")
+
 

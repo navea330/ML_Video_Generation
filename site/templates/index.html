@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title> PlantCareRUs </title>
+</head>
+<body>
+    <h1>Plant Classifier</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="image" id="imageInput" required>
+        <button type="submit">Generate</button>
+    </form>
+
+    <h3>Results:</h3>
+    <p id="result"></p>
+    <button id="downloadBtn" style="display:none;">Download your care guide!</button>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const result = document.getElementById('result');
+        const downloadBtn = document.getElementById('downloadBtn');
+        let csvData = "";
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('imageInput');
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                result.innerText = "Error: " + data.error;
+                downloadBtn.style.display = "none";
+            } else {
+                result.innerText = `Predicted Plant: ${data.plant}\nCare Info: ${data.care}`;
+                csvData = data.csv;
+                downloadBtn.style.display = "inline";
+            }
+        });
+
+        downloadBtn.addEventListener('click', async () => {
+            const form = new FormData();
+            form.append("csv_data", csvData);
+
+            const response = await fetch('/download_csv', {
+                method: 'POST',
+                body: form
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "plant_info.csv";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        });
+    </script>
+</body>
+</html>
