@@ -5,13 +5,14 @@ from tqdm import tqdm
 from data.datasets import download_dataset, get_dataloaders
 from models.plantcnn import build_model
 from evals.visualizer import plot_training_curves
+from sklearn.metrics import precision_score, recall_score
 from config import IMG_SIZE
 
 def train_model(
     device="cpu",
     num_epochs=20,
     lr=1e-4,
-    patience_limit=5,
+    patience_limit=3,
     batch_size=None
 ):
     path = download_dataset()
@@ -23,7 +24,7 @@ def train_model(
     model = build_model(num_classes).to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay = 0.01)
 
     best_val_loss = float("inf")
     patience = 0
@@ -90,6 +91,9 @@ def train_model(
     test_loss = 0
     correct = 0
     total = 0
+    all_test_predictions = []
+    all_test_labels = []
+
     with torch.no_grad():
         for images, labels in tqdm(test_loader, desc="Testing"):
             images, labels = images.to(device), labels.to(device)
@@ -101,9 +105,22 @@ def train_model(
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
+            all_test_predictions.extend(predicted.cpu().numpy())
+            all_test_labels.extend(labels.cpu().numpy())
+
+
     test_loss /= len(test_loader.dataset)
     test_acc = correct / total
-    print(f"Test Loss = {test_loss:.4f}, Test Acc = {test_acc:.4f}")
+    test_precision = precision_score(all_test_labels, all_test_predictions, average='macro', zero_division=0)
+    test_recall = recall_score(all_test_labels, all_test_predictions, average='macro', zero_division=0)
+    print(f"Test Loss = {test_loss:.4f} \n")
+
+    
+    print("FINAL TEST METRICS:")
+    print(f"Test Accuracy:  {test_acc:.4f} \n")
+    print(f"Test Precision: {test_precision:.4f} \n")
+    print(f"Test Recall:    {test_recall:.4f} \n")
+
 
     plot_training_curves(train_losses, val_losses, val_accuracies, save_path = "outputs/training_curves.png")
 

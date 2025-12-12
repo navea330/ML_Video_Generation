@@ -1,7 +1,7 @@
 from PIL import Image
 import torch
 from torchvision import transforms
-from models.plantcnn import PlantCNN
+from models.plantcnn import build_model
 from config import IMG_SIZE, BATCH_SIZE
 
 def predict_plant(image_path, model_path="checkpoints/plant_cnn_best.pth", classes=None, device="cpu"):
@@ -19,7 +19,7 @@ def predict_plant(image_path, model_path="checkpoints/plant_cnn_best.pth", class
 
     # Load model
     num_classes = len(classes)
-    model = PlantCNN(num_classes=num_classes).to(device)
+    model = build_model(num_classes=num_classes).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
