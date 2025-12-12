@@ -122,6 +122,6 @@ def train_model(
     print(f"Test Recall:    {test_recall:.4f} \n")
 
 
-    plot_training_curves(train_losses, val_losses, val_accuracies, save_path = "outputs/training_curves.png")
+    plot_training_curves(train_losses, val_losses, val_accuracies, save_path = "evals/training_curves.png")
 
 
