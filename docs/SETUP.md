@@ -146,9 +146,4 @@ Lower model size or batch size.
 
 Delete `.cache/kagglehub` and re-run training.
 
----
-
-## You're Ready!
-
-Your ML plant-care assistant + classifier + RAG pipeline is now fully set up.
 

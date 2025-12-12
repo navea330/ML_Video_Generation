@@ -1,4 +1,5 @@
 # Plant Care Guide Generation
+Takes in a user inputted plant image and classifies it to a specific type and gives specific care guide information.
 
 ## What It Does
 This project finetunes a ResNet model for plant image classification using PyTorch. It downloads a plant image dataset and standardized each image to finetune the model with regularization tehcniques. After training, it generates a training curve visualization and performance metrics. It utilizes a Flask web interface that allows users to upload a plant image and receive the plant type with RAG generated plant care info. 
@@ -39,9 +40,9 @@ The web page will load at: http://127.0.0.1:5000
 
 ## Video Links
 
-**Demo Video**: 
+**Project Demo**: https://duke.box.com/s/4oa7bgh3h2ptayz7ixudp05nfzkofmy2 
 
-**Technical Walkthrough:**:
+**Technical Walkthrough:**: https://duke.box.com/s/6tl4r330xjmsjoa866gxpzqhqroue3l2 
 
 
 ## Evaluation
